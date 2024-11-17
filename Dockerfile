@@ -8,7 +8,7 @@
 
 ################################################################################
 # Create a stage for building the application.
-ARG GO_VERSION=1.22.3
+ARG GO_VERSION=1.23.2
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 LABEL org.opencontainers.image.source=https://github.com/dreamsofcode-io/guestbook
 WORKDIR /src
@@ -72,11 +72,8 @@ USER appuser
 
 # Copy the executable from the "build" stage.
 COPY --from=build /bin/server /bin/
-COPY ./migrations ./migrations
 COPY ./templates ./templates
 COPY ./static ./static
-
-ENV MIGRATIONS_URL=file://migrations
 
 # Expose the port that the application listens on.
 EXPOSE 8080

@@ -9,30 +9,32 @@ import (
 	"strings"
 
 	goaway "github.com/TwiN/go-away"
+	"github.com/jackc/pgx/v5/pgxpool"
+	// "github.com/x-way/crawlerdetect"
+
 	"github.com/dreamsofcode-io/guestbook/internal/guest"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/dreamsofcode-io/guestbook/internal/repository"
 )
 
 type Guestbook struct {
 	logger *slog.Logger
 	tmpl   *template.Template
-	repo   *guest.Repo
+	repo   *repository.Queries
 }
 
 func New(
 	logger *slog.Logger, db *pgxpool.Pool, tmpl *template.Template,
 ) *Guestbook {
-	repo := guest.NewRepo(db)
 	return &Guestbook{
 		tmpl:   tmpl,
-		repo:   repo,
+		repo:   repository.New(db),
 		logger: logger,
 	}
 }
 
 type indexPage struct {
-	Guests []guest.Guest
-	Total  int
+	Guests []repository.Guest
+	Total  int64
 }
 
 type errorPage struct {
@@ -40,7 +42,7 @@ type errorPage struct {
 }
 
 func (h *Guestbook) Home(w http.ResponseWriter, r *http.Request) {
-	guests, err := h.repo.FindAll(r.Context(), 20)
+	guests, err := h.repo.FindAll(r.Context(), 200)
 	if err != nil {
 		h.logger.Error("failed to find guests", slog.Any("error", err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -62,6 +64,11 @@ func (h *Guestbook) Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Guestbook) Create(w http.ResponseWriter, r *http.Request) {
+	// if crawlerdetect.IsCrawler(r.Header.Get("User-Agent")) {
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	return
+	// }
+	//
 	if err := r.ParseForm(); err != nil {
 		h.logger.Error("failed to parse form", slog.Any("error", err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -107,7 +114,12 @@ func (h *Guestbook) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repo.Insert(r.Context(), guest)
+	_, err = h.repo.Insert(r.Context(), repository.InsertParams{
+		ID:        guest.ID,
+		Message:   guest.Message,
+		CreatedAt: guest.CreatedAt,
+		Ip:        guest.IP,
+	})
 	if err != nil {
 		h.logger.Error("failed to insert guest", slog.Any("error", err))
 		w.WriteHeader(http.StatusInternalServerError)
